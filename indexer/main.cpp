@@ -1,10 +1,12 @@
 #include <iostream>
+#include <ostream>
 #include <string>
 #include <vector>
 #include <unordered_map>
 #include <cctype>
 #include <ctime>
 #include <fstream>
+#include <algorithm>
 
 // Структуры данных
 struct DocNode {
@@ -122,9 +124,24 @@ bool extract(const std::string& json, const std::string& field, std::string& out
     size_t pos = json.find(search);
     if (pos == std::string::npos) return false;
     pos += search.size();
-    size_t end = json.find("\"", pos);
-    if (end == std::string::npos) return false;
+
+    size_t end = pos;
+    while (end < json.size()) {
+        if (json[end] == '\"' && (end == 0 || json[end-1] != '\\')) {
+            break;
+        }
+        end++;
+    }
+
+    if (end == json.size()) return false;
     out = json.substr(pos, end - pos);
+
+    size_t esc_pos = 0;
+    while ((esc_pos = out.find("\\\"", esc_pos)) != std::string::npos) {
+        out.replace(esc_pos, 2, "\"");
+        esc_pos++;
+    }
+
     return true;
 }
 
@@ -177,6 +194,23 @@ void save_inverted(const char* fn) {
     out.close();
 }
 
+// Сохранение CSV для закона Ципфа
+void save_zipf(const char* fn) {
+    std::ofstream out(fn);
+    out << "rank,term,frequency\n";
+
+    std::vector<TermEntry*> terms;
+    for (auto &p : hash_table) terms.push_back(p.second);
+
+    std::sort(terms.begin(), terms.end(),
+              [](TermEntry* a, TermEntry* b){ return b->freq < a->freq; });
+
+    for (size_t i = 0; i < terms.size(); ++i) {
+        out << (i+1) << "," << terms[i]->term << "," << terms[i]->freq << "\n";
+    }
+    out.close();
+}
+
 
 
 int main() {
@@ -204,6 +238,7 @@ int main() {
 
     save_forward("forward.idx");
     save_inverted("inverted.idx");
+    save_zipf("zipf.csv");
 
 
     // Вывод статистики
@@ -216,6 +251,11 @@ int main() {
     std::cout << "Time: " << elapsed << " sec\n";
     std::cout << "Speed: " << (stats.total_input_bytes / 1024.0) / elapsed << " KB/sec\n";
 
+
+    std::cout << "Terms" << std::endl;
+    for (auto& [key, value] : hash_table) {
+        std::cout << key << ": " << value->freq << std::endl;
+    }
 
     return 0;
 }
