@@ -1,0 +1,21 @@
+db:
+  host: mongodb
+  port: 27017
+  database: crawler_db
+  username: admin
+  password: password123
+
+logic:
+  delay: 0.5
+
+  user_agent: "SearchBot/1.0"
+  recheck_interval: 86400
+  respect_robots_txt: false
+  sources:
+    - name: "Match TV"
+      url: "https://matchtv.ru"
+      description: "Match TV"
+
+    - name: "Tass News"
+      url: "https://tass.ru"
+      description: "Tass News"
