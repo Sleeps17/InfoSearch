@@ -1,0 +1,494 @@
+\documentclass[12pt,a4paper]{article}
+
+\usepackage[a4paper,margin=2cm]{geometry}
+\usepackage{iftex}
+\usepackage{graphicx}
+
+\ifPDFTeX
+  \usepackage[T2A]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage[russian]{babel}
+  \usepackage{lmodern}
+\else
+  \usepackage{fontspec}
+  \usepackage[russian]{babel}
+  \defaultfontfeatures{Ligatures=TeX}
+  \setmainfont{Times New Roman}
+\fi
+
+\usepackage{microtype}
+\usepackage{setspace}
+\setstretch{1.2}
+
+\usepackage{hyperref}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  urlcolor=blue
+}
+
+\usepackage{booktabs}
+\usepackage{tabularx}
+
+\usepackage{enumitem}
+\setlist[itemize]{leftmargin=1.5em, itemsep=0.15em, topsep=0.25em}
+
+\usepackage{listings}
+\usepackage{xcolor}
+
+% Настройка listings для работы с UTF-8
+\usepackage{listingsutf8}
+
+\lstdefinestyle{bash}{
+  language=bash,
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  columns=fullflexible,
+  frame=single,
+  framerule=0.3pt,
+  xleftmargin=0.5em,
+  xrightmargin=0.5em,
+  showstringspaces=false,
+  inputencoding=utf8  % Важно для русского текста
+}
+
+\lstset{
+  style=bash,
+  literate={а}{{\selectfont\char224}}1
+           {б}{{\selectfont\char225}}1
+           {в}{{\selectfont\char226}}1
+           {г}{{\selectfont\char227}}1
+           {д}{{\selectfont\char228}}1
+           {е}{{\selectfont\char229}}1
+           {ё}{{\"e}}1
+           {ж}{{\selectfont\char230}}1
+           {з}{{\selectfont\char231}}1
+           {и}{{\selectfont\char232}}1
+           {й}{{\selectfont\char233}}1
+           {к}{{\selectfont\char234}}1
+           {л}{{\selectfont\char235}}1
+           {м}{{\selectfont\char236}}1
+           {н}{{\selectfont\char237}}1
+           {о}{{\selectfont\char238}}1
+           {п}{{\selectfont\char239}}1
+           {р}{{\selectfont\char240}}1
+           {с}{{\selectfont\char241}}1
+           {т}{{\selectfont\char242}}1
+           {у}{{\selectfont\char243}}1
+           {ф}{{\selectfont\char244}}1
+           {х}{{\selectfont\char245}}1
+           {ц}{{\selectfont\char246}}1
+           {ч}{{\selectfont\char247}}1
+           {ш}{{\selectfont\char248}}1
+           {щ}{{\selectfont\char249}}1
+           {ъ}{{\selectfont\char250}}1
+           {ы}{{\selectfont\char251}}1
+           {ь}{{\selectfont\char252}}1
+           {э}{{\selectfont\char253}}1
+           {ю}{{\selectfont\char254}}1
+           {я}{{\selectfont\char255}}1
+           {А}{{\selectfont\char192}}1
+           {Б}{{\selectfont\char193}}1
+           {В}{{\selectfont\char194}}1
+           {Г}{{\selectfont\char195}}1
+           {Д}{{\selectfont\char196}}1
+           {Е}{{\selectfont\char197}}1
+           {Ё}{{\"E}}1
+           {Ж}{{\selectfont\char198}}1
+           {З}{{\selectfont\char199}}1
+           {И}{{\selectfont\char200}}1
+           {Й}{{\selectfont\char201}}1
+           {К}{{\selectfont\char202}}1
+           {Л}{{\selectfont\char203}}1
+           {М}{{\selectfont\char204}}1
+           {Н}{{\selectfont\char205}}1
+           {О}{{\selectfont\char206}}1
+           {П}{{\selectfont\char207}}1
+           {Р}{{\selectfont\char208}}1
+           {С}{{\selectfont\char209}}1
+           {Т}{{\selectfont\char210}}1
+           {У}{{\selectfont\char211}}1
+           {Ф}{{\selectfont\char212}}1
+           {Х}{{\selectfont\char213}}1
+           {Ц}{{\selectfont\char214}}1
+           {Ч}{{\selectfont\char215}}1
+           {Ш}{{\selectfont\char216}}1
+           {Щ}{{\selectfont\char217}}1
+           {Ъ}{{\selectfont\char218}}1
+           {Ы}{{\selectfont\char219}}1
+           {Ь}{{\selectfont\char220}}1
+           {Э}{{\selectfont\char221}}1
+           {Ю}{{\selectfont\char222}}1
+           {Я}{{\selectfont\char223}}1
+}
+
+\setlength{\parindent}{1.25cm}
+\setlength{\parskip}{0.15em}
+
+\begin{document}
+\begin{titlepage}
+\centering
+{\large МОСКОВСКИЙ АВИАЦИОННЫЙ ИНСТИТУТ \par}
+{\large (НАЦИОНАЛЬНЫЙ ИССЛЕДОВАТЕЛЬСКИЙ УНИВЕРСИТЕТ) \par}
+\vspace{1.6cm}
+{\large Институт №8 «Компьютерные науки и прикладная математика» \par}
+
+\vfill
+
+{\LARGE \textbf{Отчет по лабораторным работам} \par}
+\vspace{0.4cm}
+{\Large по курсу «Информационный поиск» \par}
+
+\vfill
+
+\begin{flushright}
+Выполнил: Бачурин Павел Дмитриевич\\
+Группа: М8О-403Б-22\\
+Преподаватель: Кухтичев Антон Алексеевич
+\end{flushright}
+
+\vfill
+
+{Москва, 2025}
+\end{titlepage}
+
+\section*{Введение}
+
+Цель работы — разработать минимальный поисковый движок по собственному корпусу документов. Корпус собирается поисковым роботом (crawler) и хранится в MongoDB. Поиск реализован на C++ и включает токенизацию, стемминг, построение частотного распределения и проверку закона Ципфа, а также булев индекс и булев поиск. Для взаимодействия предусмотрены два интерфейса: CLI и веб-сервис (HTML-форма).
+
+\section*{Анализ корпуса документов}
+
+\subsection*{1. Описание корпуса и характеристик документов}
+
+В качестве источников использованы русскоязычные новостные порталы Match TV и Tass. Документы представляют собой HTML-страницы новостных статей спортивной и общественно-политической тематики.
+
+\begin{itemize}
+\item Match TV: спортивные новости, трансляции, интервью, аналитические материалы.
+\item Tass: новости политики, экономики, спорта, культуры, науки и технологий.
+\end{itemize}
+
+Тип документа в корпусе: веб-страница новости/статьи в формате HTML
+
+Язык: русский (основной контент), встречаются англицизмы, имена собственные и термины на английском языке
+
+\subsubsection*{1.1. Из чего состоит «сырой» документ (HTML)}
+
+У обоих источников «сырой» документ (HTML) обычно содержит:
+
+\begin{itemize}
+\item основной контент статьи
+\item заголовок (H1) и подзаголовки (H2-H4)
+\item дата/время публикации (иногда с указанием времени обновления)
+\item рубрика/раздел/теги
+\item текст статьи (абзацы с форматированием: жирный, курсив, цитаты)
+\item мультимедийный контент: изображения с подписями, видео-вставки, инфографика
+\item ссылки на связанные материалы (по теме, архивные публикации)
+\item навигационные элементы: хлебные крошки, меню категорий
+\item блоки социальных кнопок (поделиться в соцсетях)
+\item элементы авторизации/регистрации, подписки на рассылку
+\item комментарии пользователей (на Match TV, у Tass обычно без комментариев)
+\item мета-теги для SEO (description, keywords, Open Graph)
+\item канонический URL (canonical link)
+\end{itemize}
+
+\subsection*{2. Выделение текста из «сырых» HTML документов}
+
+\subsubsection*{2.1. Что считать «текстом документа»}
+
+При индексации из HTML выделяется только содержательный текст:
+
+\begin{itemize}
+\item заголовок статьи (обычно в теге h1 или в специальном контейнере);
+\item основной текст статьи (абзацы в тегах p, div с классом статьи);
+\item лид/аннотация (краткое введение перед текстом);
+\item подписи к изображениям и видео;
+\item имена авторов и источников информации (при наличии).
+\end{itemize}
+
+В проекте используется упрощённое «снятие» тегов: удаление HTML-тегов и специальных секций (script/style/noscript) с последующей нормализацией пробелов. Для Match TV и Tass особенно важно корректно выделять основной контент, так как на новостных сайтах много навигационных и рекламных блоков. Для повышения качества можно использовать DOM-парсер с CSS-селекторами, нацеленными на контейнеры с классом статьи (например, article-content, post-text, news-text).
+
+\subsection*{3. Проверка "пригодности корпуса": существующий поиск по документам}
+
+Требование ЛР: если нельзя искать по документам существующими поисковиками — корпус использовать нельзя.
+
+\subsubsection*{3.1. Встроенный поиск по сайту}
+
+\begin{itemize}
+\item Match TV: присутствует страница поиска \url{https://matchtv.ru/search/}
+\item Tass: присутствует страница поиска \url{https://tass.ru/search}
+\end{itemize}
+
+Вывод: корпус можно использовать — существует встроенный поиск у обоих источников.
+
+\subsubsection*{3.2. Внешний поиск (Google / Яндекс) с ограничением на сайт}
+
+Можно искать по домену с оператором site: в Google:
+\begin{itemize}
+\item site:matchtv.ru [запрос]
+\item site:tass.ru [запрос]
+\end{itemize}
+
+Также у Яндекса есть аналогичные операторы для ограничения поиска по сайту.
+
+\subsection*{4. Примеры запросов к существующим поисковикам и недостатки выдачи}
+
+\subsubsection*{4.1. Примеры запросов (встроенный поиск)}
+
+Match TV - запрос: "футбол чемпионат мира"
+
+Tass - запрос: "экономика санкции" с фильтрацией по дате
+
+\subsubsection*{4.2. Примеры запросов (Google/Яндекс с site:)}
+
+Google: site:matchtv.ru "хоккей КХЛ"
+
+Google: site:tass.ru "выборы президента"
+
+Яндекс: site:tass.ru "космическая программа" + последние новости
+
+\subsubsection*{4.3. Недостатки поисковой выдачи}
+
+\begin{itemize}
+\item Дублирование новостей: одно и то же событие может быть опубликовано в нескольких новостных лентах с разными заголовками и акцентами.
+\item Временная релевантность: свежие новости часто ранжируются выше исторически важных, даже если последние более релевантны запросу.
+\item Проблемы с поиском архивных материалов: старые статьи могут быть плохо проиндексированы или недоступны через встроенный поиск.
+\item Зависимость от формулировки: спортивные термины и политические формулировки часто требуют точного совпадения, синонимы могут давать разные результаты.
+\end{itemize}
+
+\subsection*{5. Статистика по корпусу}
+
+\subsubsection*{5.1. Общая статистика корпуса}
+
+\begin{table}[ht]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}Xrrr@{}}
+\toprule
+Показатель & matchtv.ru & tass.ru & Итого \\
+\midrule
+Кол-во документов & 25000 & 35000 & 60000 \\
+Raw объём, MB & 415.27 & 521.43 & 936.70 \\
+Выделенный текст, символов & 185 432 150 & 378 916 278 & 564 348 428 \\
+Средний текст, символов/док & 7417.29 & 10826.18 & 9405.81 \\
+Среднее кол-во слов/док & 1236.22 & 1804.36 & 1567.64 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsubsection*{5.2. Особенности статистики}
+
+\begin{itemize}
+\item Tass имеет более длинные статьи в среднем (общественно-политические, аналитические материалы)
+\item Match TV статьи короче, но чаще обновляются (спортивные новости, трансляции)
+\item Оба источника содержат структурированные даты публикации, что полезно для временных фильтров
+\item Высокая плотность именованных сущностей: имена спортсменов, команд, политиков, организаций
+\end{itemize}
+
+\subsection*{6. Итоговый вывод}
+
+Корпус из материалов matchtv.ru и tass.ru пригоден для выполнения последующих лабораторных работ, т.к.:
+
+\begin{itemize}
+\item документы имеют четкую структуру новостной статьи с выделяемым основным текстом
+\item существует проверяемый поиск по исходным документам: встроенный поиск обоих сайтов и внешний поиск с ограничением site
+\item разнообразие тематик (спорт и общественно-политические новости) позволяет тестировать поиск на разных типах запросов
+\item наличие мета-данных (дата, категория, теги) предоставляет дополнительные возможности для фильтрации и ранжирования
+\item корпус представляет актуальный языковой материал современного русского языка в новостной сфере
+\end{itemize}
+
+\section*{Поисковая система и Crawler}
+
+\subsection*{1. Архитектура поисковой системы}
+
+\subsubsection*{1.1. Общая схема работы}
+
+Поисковый робот обходит страницы целевых сайтов, извлекает ссылки на документы, скачивает HTML и сохраняет результат в MongoDB. Робота можно остановить и запустить снова — он продолжает обход с места остановки, используя коллекцию frontier.
+
+\subsubsection*{1.2. Формат хранимого документа}
+
+В коллекции документов сохраняются поля:
+
+\begin{itemize}
+\item content\_hash — хеш содержимого документа;
+\item crawl\_date — дата обкачки (Unix time stamp);
+\item html\_content — «сырой» HTML документа;
+\item source\_name — название источника (matchtv или tass);
+\item url — нормализованный URL документа;
+\end{itemize}
+
+\subsubsection*{1.3. Повторная обкачка и проверка изменений}
+
+При повторной обкачке документ обновляется только в случае изменений. Проверка может выполняться по хешу HTML, заголовкам ETag/Last-Modified или по сравнению нормализованного текста.
+
+\subsubsection*{1.4. Конфигурация (YAML)}
+
+Робот получает единственный аргумент — путь к YAML-конфигу.
+
+\subsection*{2. Индексация и поисковые компоненты (C++)}
+
+\subsubsection*{2.1. Источник данных для индексации}
+
+Индексатор считывает из stdin документы в JSON формате, содержащие поля html\_content, url, source\_name. В стандартный ввод данные попадают из MongoDB при помощи утилиты mongoexport.
+
+\subsubsection*{2.2. Токенизация}
+
+Токенизация выполняется по следующим правилам:
+
+\begin{itemize}
+\item текст переводится в нижний регистр;
+\item токеном считается последовательность букв/цифр (включая кириллицу);
+\item знаки пунктуации и служебные символы выступают разделителями.
+\end{itemize}
+
+Недостатки: возможны «неудачные» токены (например, c++17, e-mail, url, 3.14, слова с дефисами).
+
+Улучшение: отдельные правила для дефисов, апострофов, сокращений, а также выделение токенов из camelCase.
+
+\subsubsection*{2.3. Статистика токенизации и время работы}
+
+Индексатор выводит требуемые статистики: количество токенов, среднюю длину токена, а также время выполнения и скорость токенизации (KB/s).
+
+Пример запуска в Docker:
+
+\begin{lstlisting}
+mongoexport \
+    --db $MONGO_DB \
+    --collection $MONGO_COLLECTION \
+    --username $MONGO_USERNAME \
+    --password $MONGO_PASSWORD \
+    --authenticationDatabase admin \
+    --fields _html_content,url,source_name \
+    --quiet | ./indexer
+\end{lstlisting}
+
+Вывод программы (полученные значения):
+
+\begin{lstlisting}
+Documents: 35000
+Unique terms: 805701
+Total tokens: 9240789
+Avg token length: 16.3485
+Input size: 2005990.1 KB
+Time: 2689.8331 sec
+Speed: 745.99 KB/sec
+\end{lstlisting}
+
+\subsubsection*{2.4. Закон Ципфа}
+
+После индексации строится распределение частот терминов по рангам.
+
+Индексатор сохраняет CSV-файл (zipf.csv), содержащий rank, freq и значение аппроксимации Zipf C/r.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.8\linewidth]{images/zipf.png}
+  \caption{График распределения Ципфа}
+  \label{fig:zipf}
+\end{figure}
+
+\subsubsection*{2.5. Стемминг}
+
+Для нормализации словоформ используется упрощённый стеммер (поддержка русского и английского). Нормализация применяется на этапе индексации и на этапе обработки запроса.
+
+Оценка качества: сравнение выдачи до/после стемминга на нескольких запросах, включая случаи ухудшения (омонимия, чрезмерное обрезание суффиксов).
+
+\subsubsection*{2.6. Булев индекс}
+
+Булев (инвертированный) индекс хранит для каждого термина список идентификаторов документов, в которых он встречается. Для словаря и списков документов используются собственные структуры данных (без map/unordered\_map).
+
+\subsubsection*{2.7. Булев поиск и интерфейсы}
+
+Поддерживаются операции AND, OR, NOT и круглые скобки. Результат поиска — список документов (url и источник). Реализованы два интерфейса:
+
+\begin{itemize}
+\item CLI: запросы читаются из аргумента запуска или stdin, результаты выводятся в stdout.
+\item Web: HTTP-сервер с HTML-формой ввода и HTML-выдачей.
+\end{itemize}
+
+\subsection*{3. Примеры запросов и проверка работы}
+
+\subsubsection*{3.1. CLI}
+
+Пример запуска CLI-поиска (индекс должен быть построен заранее):
+
+\begin{lstlisting}
+./engine 'search query with && operator'
+\end{lstlisting}
+
+Пример вывода:
+
+\begin{lstlisting}
+Found 3 documents:
+- https://matchtv.ru/channel/matchtv/programs
+- https://matchtv.ru/author/vasilii-bogdanov
+- https://matchtv.ru/author/evgenii-dzichkovskii
+\end{lstlisting}
+
+\subsubsection*{3.2. Web}
+
+Пример запуска веб-сервиса:
+
+\begin{lstlisting}
+python3 main.py
+\end{lstlisting}
+
+Пример вывода:
+
+\begin{lstlisting}
+Базовая директория: /home/user/MAI/InfoSearch/engine
+Путь к engine: /home/user/MAI/InfoSearch/engine/engine
+Путь к forward.idx: /home/user/MAI/InfoSearch/engine/forward.idx
+Путь к inverted.idx: /home/user/MAI/InfoSearch/engine/inverted.idx
+Сервер запущен: http://localhost:8000
+\end{lstlisting}
+
+Примеры запросов для проверки:
+
+\begin{itemize}
+\item футбол \&\& тайм
+\item футбол || хоккей
+\item матч \&\& спорт
+\item (матч \&\& футбол) || хоккей
+\end{itemize}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.8\linewidth]{images/ui_1.png}
+  \caption{Веб-интерфейс поисковой системы}
+  \label{fig:ui1}
+\end{figure}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.8\linewidth]{images/ui_2.png}
+  \caption{Результаты поиска}
+  \label{fig:ui2}
+\end{figure}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.8\linewidth]{images/ui_3.png}
+  \caption{Просмотр документа}
+  \label{fig:ui3}
+\end{figure}
+
+\section*{Заключение}
+
+\subsection*{Итоговые выводы}
+
+В ходе выполнения данных лабораторных работ я познакомился с тем, как устроены современные поисковые системы, и даже сумел реализовать свою собственную.
+
+Моя поисковая система:
+\begin{itemize}
+\item содержит расширяемый бинарный индекс, включающий обратный и прямой индексы, пригодный для булева поиска.
+\item реализует булев поиск с поддержкой AND, OR, NOT, пробелов и скобок;
+\item запускается в Docker;
+\item предоставляет два интерфейса – CLI и Web;
+\item предоставляет возможность смотреть на raw HTML выдаваемых документов.
+\end{itemize}
+
+Скорость выполнения запросов находится в миллисекундном диапазоне для типовых случаев; длительная работа возникает на выражениях с большими объединениями и отрицаниями частых термов.
+
+В целом поисковую систему можно дорабатывать и добавлять к ней новые функции, которые позволят улучшить качество и скорость поиска.
+
+\end{document}
