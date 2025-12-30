@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 #include <cctype>
 #include <ctime>
 #include <fstream>
@@ -41,9 +42,40 @@ std::vector<Document> documents;
 Stats stats;
 
 bool is_valid_char(char c) {
-    if (std::isalpha(static_cast<unsigned char>(c))) return true;
     unsigned char uc = static_cast<unsigned char>(c);
-    return (uc >= 0xD0 && uc <= 0xD1);
+
+    if (uc >= '0' && uc <= '9') return true;
+
+    if (uc == 0xD0 || uc == 0xD1) {
+        return true;
+    }
+
+    return false;
+}
+
+bool is_pure_number(const std::string& token) {
+    for (char c : token) {
+        if (!(c >= '0' && c <= '9')) {
+            unsigned char uc = static_cast<unsigned char>(c);
+            if (!(uc == 0xD0 || uc == 0xD1)) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+bool should_skip_token(const std::string& token) {
+    if (token.empty()) return true;
+    if (token.size() == 1 && !std::isalpha(static_cast<unsigned char>(token[0]))) return true;
+
+    static const std::unordered_set<std::string> stop_tokens = {
+        "quot", "amp", "lt", "gt", "nbsp",
+        "http", "https", "www", "com", "ru", "org", "n",
+        "class", "quotquot", "a", "navlist", "div", "link", "span"
+    };
+
+    return stop_tokens.count(token) > 0 || is_pure_number(token);
 }
 
 // Стемминг
@@ -102,7 +134,7 @@ void process_html(const std::string& html, int doc_id) {
 
         if (is_valid_char(html[i])) {
             token += html[i];
-        } else if (!token.empty()) {
+        } else if (!token.empty() && !should_skip_token(token)) {
             std::string t = stem(token);
             add_term(t, doc_id);
             stats.total_tokens++;
@@ -110,7 +142,7 @@ void process_html(const std::string& html, int doc_id) {
             token.clear();
         }
     }
-    if (!token.empty()) {
+    if (!token.empty() && !should_skip_token(token)) {
         std::string t = stem(token);
         add_term(t, doc_id);
         stats.total_tokens++;
@@ -243,7 +275,6 @@ int main() {
     save_zipf("zipf.csv");
 
 
-    // Вывод статистики
     std::cout << "Documents: " << stats.doc_count << "\n";
     std::cout << "Unique terms: " << stats.total_unique_terms << "\n";
     std::cout << "Total tokens: " << stats.total_tokens << "\n";
