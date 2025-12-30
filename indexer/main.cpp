@@ -1,300 +1,199 @@
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
+#include <iostream>
+#include <string>
+#include <vector>
+#include <unordered_map>
 #include <cctype>
 #include <ctime>
-#include <locale.h>
-#include <wchar.h>
-#include <wctype.h>
-
-// Константы
-const uint MAX_TOKEN_LEN = 64;
-const uint MAX_DOCS = 1000000;
-const uint HASH_SIZE = 1000003;
-const uint MAX_LINE = 1024 * 1024;
+#include <fstream>
 
 // Структуры данных
 struct DocNode {
     int doc_id;
-    DocNode *next;
+    DocNode* next;
 };
 
 struct TermEntry {
-    wchar_t term[MAX_TOKEN_LEN];
-    long long freq;
-    int doc_count;
-    DocNode *docs;
-    TermEntry *next;
+    std::string term;
+    long long freq = 0;
+    int doc_count = 0;
+    DocNode* docs = nullptr;
 };
 
 struct Document {
-    char title[256];
-    char url[512];
-    char oid[32];
+    std::string title;
+    std::string url;
+    std::string oid;
 };
 
-typedef struct {
-    int doc_count;
-    long long total_tokens;
-    long long total_token_length;
-    long long total_input_bytes;
-    long long total_unique_terms;
-} Stats;
+struct Stats {
+    int doc_count = 0;
+    long long total_tokens = 0;
+    long long total_token_length = 0;
+    long long total_input_bytes = 0;
+    long long total_unique_terms = 0;
+};
 
 // Глобальные переменные
-TermEntry *hash_table[HASH_SIZE];
-Document documents[MAX_DOCS];
-Stats stats = {0, 0, 0, 0, 0};
+std::unordered_map<std::string, TermEntry*> hash_table;
+std::vector<Document> documents;
+Stats stats;
 
-// Функция хеширования для wide char
-unsigned int hash(const wchar_t *s) {
-    unsigned int h = 5381;
-    while (*s)
-        h = ((h << 5) + h) + (unsigned int)(*s++);
-    return h % HASH_SIZE;
+bool is_valid_char(char c) {
+    if (std::isalpha(static_cast<unsigned char>(c))) return true;
+    unsigned char uc = static_cast<unsigned char>(c);
+    return (uc >= 0xD0 && uc <= 0xD1);
 }
 
-// Фильтрация HTML
-struct HtmlState {
-    int inside_tag;
-    int inside_script;
-    int inside_style;
-    int is_closing;
-    char tag[32];
-    int tag_len;
-};
-
-int html_filter_char(wchar_t c, HtmlState &st) {
-    if (c == L'<') {
-        st.inside_tag = 1;
-        st.tag_len = 0;
-        st.is_closing = 0;
-        return 0;
+// Стемминг
+std::string stem(const std::string& token) {
+    std::string t = token;
+    if (t.size() > 2) {
+        if (t.size() > 4 && t.substr(t.size()-2) == "ов") t = t.substr(0, t.size()-2);
+        else if (t.size() > 4 && t.substr(t.size()-2) == "ев") t = t.substr(0, t.size()-2);
+        else if (t.size() > 4 && t.substr(t.size()-2) == "ам") t = t.substr(0, t.size()-2);
+        else if (t.size() > 4 && t.substr(t.size()-2) == "ём") t = t.substr(0, t.size()-2);
     }
-
-    if (st.inside_tag) {
-        if (c == L'/')
-            st.is_closing = 1;
-        else if (iswalpha(c) && st.tag_len < 31) {
-            st.tag[st.tag_len++] = (char)towlower(c);
-            st.tag[st.tag_len] = 0;
-        }
-
-        if (c == L'>') {
-            st.inside_tag = 0;
-            if (!strcmp(st.tag, "script"))
-                st.inside_script = !st.is_closing;
-            else if (!strcmp(st.tag, "style"))
-                st.inside_style = !st.is_closing;
-        }
-        return 0;
-    }
-
-    if (st.inside_script || st.inside_style)
-        return 0;
-
-    return c;
+    return t;
 }
 
-// Проверка на русскую или английскую букву
-int is_valid_char(wchar_t c) {
-    return iswalnum(c) ||
-           (c >= L'А' && c <= L'Я') ||
-           (c >= L'а' && c <= L'я') ||
-           c == L'Ё' || c == L'ё';
-}
-
-// Стемминг для wide char
-void stem(wchar_t *t) {
-    int len = wcslen(t);
-    if (len > 4 && !wcscmp(t + len - 2, L"ов")) t[len - 2] = 0;
-    else if (len > 4 && !wcscmp(t + len - 2, L"ев")) t[len - 2] = 0;
-    else if (len > 4 && !wcscmp(t + len - 2, L"ам")) t[len - 2] = 0;
-    else if (len > 4 && !wcscmp(t + len - 2, L"ём")) t[len - 2] = 0;
-    else if (len > 5 && !wcscmp(t + len - 3, L"ing")) t[len - 3] = 0;
-    else if (len > 4 && !wcscmp(t + len - 2, L"ed")) t[len - 2] = 0;
-}
-
-// Построение индекса
-void add_doc(TermEntry *t, int doc_id) {
-    DocNode *n = t->docs;
+// Добавление документа к терму
+void add_doc(TermEntry* t, int doc_id) {
+    DocNode* n = t->docs;
     while (n) {
-        if (n->doc_id == doc_id)
-            return;
+        if (n->doc_id == doc_id) return;
         n = n->next;
     }
-
-    n = (DocNode *)malloc(sizeof(DocNode));
-    n->doc_id = doc_id;
-    n->next = t->docs;
+    n = new DocNode{doc_id, t->docs};
     t->docs = n;
     t->doc_count++;
 }
 
-void add_term(const wchar_t *token, int doc_id) {
-    unsigned int h = hash(token);
-    TermEntry *e = hash_table[h];
-
-    while (e) {
-        if (!wcscmp(e->term, token)) {
-            e->freq++;
-            add_doc(e, doc_id);
-            return;
-        }
-        e = e->next;
+// Добавление терма
+void add_term(const std::string& token, int doc_id) {
+    auto it = hash_table.find(token);
+    if (it != hash_table.end()) {
+        it->second->freq++;
+        add_doc(it->second, doc_id);
+        return;
     }
-
-    e = (TermEntry *)malloc(sizeof(TermEntry));
-    wcscpy(e->term, token);
+    TermEntry* e = new TermEntry();
+    e->term = token;
     e->freq = 1;
     e->doc_count = 0;
-    e->docs = NULL;
-    e->next = hash_table[h];
-    hash_table[h] = e;
-    stats.total_unique_terms++;
-
+    e->docs = nullptr;
     add_doc(e, doc_id);
+    hash_table[token] = e;
+    stats.total_unique_terms++;
 }
 
-// Токенизация
-void process_html(const char *html, int doc_id) {
-    HtmlState st = {};
-    wchar_t token[MAX_TOKEN_LEN];
-    int len = 0;
+//Токенизация
+void process_html(const std::string& html, int doc_id) {
+    std::string token;
+    stats.total_input_bytes += html.size();
 
-    stats.total_input_bytes += strlen(html);
+    for (size_t i = 0; i < html.size(); ++i) {
+        unsigned char c = html[i];
+        if ((c & 0xC0) == 0x80) {
+            token += c;
+            continue;
+        }
 
-    // Конвертируем UTF-8 в wide char
-    size_t html_len = strlen(html);
-    wchar_t *whtml = (wchar_t *)malloc((html_len + 1) * sizeof(wchar_t));
-    mbstowcs(whtml, html, html_len + 1);
-
-    for (wchar_t *p = whtml; *p; p++) {
-        wchar_t c = *p;
-
-        if (c && is_valid_char(c)) {
-            if (len < MAX_TOKEN_LEN - 1)
-                token[len++] = towlower(c);
-        } else {
-            if (len > 0) {
-                token[len] = 0;
-                stem(token);
-                add_term(token, doc_id);
-                stats.total_tokens++;
-                stats.total_token_length += len;
-                len = 0;
-            }
+        if (is_valid_char(html[i])) {
+            token += html[i];
+        } else if (!token.empty()) {
+            std::string t = stem(token);
+            add_term(t, doc_id);
+            stats.total_tokens++;
+            stats.total_token_length += t.size();
+            token.clear();
         }
     }
-
-    free(whtml);
+    if (!token.empty()) {
+        std::string t = stem(token);
+        add_term(t, doc_id);
+        stats.total_tokens++;
+        stats.total_token_length += t.size();
+    }
 }
 
 // Парсер JSON
-char *extract(const char *json, const char *field, char *buffer, int buffer_size) {
-    char search[256];
-    snprintf(search, sizeof(search), "\"%s\":", field);
-    const char *pos = strstr(json, search);
-    if (!pos) return NULL;
-    pos += strlen(search);
-    while (*pos && isspace(*pos)) pos++;
-    if (*pos == '"') {
-        pos++;
-        int i = 0;
-        while (*pos && *pos != '"' && i < buffer_size - 1) {
-            if (*pos == '\\' && *(pos + 1)) {
-                pos++;
-                if (*pos == 'n') buffer[i++] = '\n';
-                else if (*pos == 't') buffer[i++] = '\t';
-                else if (*pos == 'r') buffer[i++] = '\r';
-                else buffer[i++] = *pos;
-                pos++;
-            } else {
-                buffer[i++] = *pos++;
-            }
-        }
-        buffer[i] = 0;
-        return buffer;
-    }
-    return NULL;
+bool extract(const std::string& json, const std::string& field, std::string& out) {
+    std::string search = "\"" + field + "\":\"";
+    size_t pos = json.find(search);
+    if (pos == std::string::npos) return false;
+    pos += search.size();
+    size_t end = json.find("\"", pos);
+    if (end == std::string::npos) return false;
+    out = json.substr(pos, end - pos);
+    return true;
 }
 
-// Сохранение индексов
-void save_forward(const char *fn) {
-    FILE *f = fopen(fn, "wb");
-    fwrite(&stats.doc_count, sizeof(int), 1, f);
 
-    for (int i = 0; i < stats.doc_count; i++) {
-        int l;
+// Сохранение прямого индекса
+void save_forward(const char* fn) {
+    std::ofstream out(fn, std::ios::binary);
+    int doc_count = static_cast<int>(documents.size());
+    out.write(reinterpret_cast<const char*>(&doc_count), sizeof(int));
 
-        l = strlen(documents[i].title);
-        fwrite(&l, sizeof(int), 1, f);
-        fwrite(documents[i].title, 1, l, f);
+    for (const auto& doc : documents) {
+        int l = static_cast<int>(doc.title.size());
+        out.write(reinterpret_cast<const char*>(&l), sizeof(int));
+        out.write(doc.title.data(), l);
 
-        l = strlen(documents[i].url);
-        fwrite(&l, sizeof(int), 1, f);
-        fwrite(documents[i].url, 1, l, f);
+        l = static_cast<int>(doc.url.size());
+        out.write(reinterpret_cast<const char*>(&l), sizeof(int));
+        out.write(doc.url.data(), l);
 
-        l = strlen(documents[i].oid);
-        fwrite(&l, sizeof(int), 1, f);
-        fwrite(documents[i].oid, 1, l, f);
+        l = static_cast<int>(doc.oid.size());
+        out.write(reinterpret_cast<const char*>(&l), sizeof(int));
+        out.write(doc.oid.data(), l);
     }
-    fclose(f);
+
+    out.close();
 }
 
-void save_inverted(const char *fn) {
-    FILE *f = fopen(fn, "wb");
-    fwrite(&stats.total_unique_terms, sizeof(long long), 1, f);
+// Сохранение обратного индекса
+void save_inverted(const char* fn) {
+    std::ofstream out(fn, std::ios::binary);
+    long long total_terms = static_cast<long long>(hash_table.size());
+    out.write(reinterpret_cast<const char*>(&total_terms), sizeof(long long));
 
-    for (int i = 0; i < HASH_SIZE; i++) {
-        TermEntry *e = hash_table[i];
-        while (e) {
-            // Конвертируем wchar_t в UTF-8 для вывода
-            char term_utf8[MAX_TOKEN_LEN * 4];
-            wcstombs(term_utf8, e->term, sizeof(term_utf8));
-            wprintf(L"TERM: %s\n", term_utf8);
+    for (const auto& [term, entry] : hash_table) {
+        out.write(reinterpret_cast<const char*>(&entry->freq), sizeof(long long));
 
-            int l = wcslen(e->term);
-            fwrite(&l, sizeof(int), 1, f);
-            fwrite(e->term, sizeof(wchar_t), l, f);
+        int l = static_cast<int>(entry->term.size());
+        out.write(reinterpret_cast<const char*>(&l), sizeof(int));
+        out.write(entry->term.data(), l);
 
-            fwrite(&e->doc_count, sizeof(int), 1, f);
+        out.write(reinterpret_cast<const char*>(&entry->doc_count), sizeof(int));
 
-            DocNode *n = e->docs;
-            while (n) {
-                fwrite(&n->doc_id, sizeof(int), 1, f);
-                n = n->next;
-            }
-            e = e->next;
+        DocNode* n = entry->docs;
+        while (n) {
+            out.write(reinterpret_cast<const char*>(&n->doc_id), sizeof(int));
+            n = n->next;
         }
     }
-    fclose(f);
+
+    out.close();
 }
+
+
 
 int main() {
-    // Устанавливаем локаль для работы с UTF-8
-    setlocale(LC_ALL, "ru_RU.UTF-8");
-
-    memset(hash_table, 0, sizeof(hash_table));
-
-    char *line = NULL;
-    size_t cap = 0;
-
+    std::string line;
     clock_t start = clock();
 
-    while (getline(&line, &cap, stdin) > 0) {
-        char html[MAX_LINE];
-        if (!extract(line, "html_content", html, MAX_LINE))
-            continue;
+    while (std::getline(std::cin, line)) {
+        std::string html, url, oid;
+        if (!extract(line, "html_content", html)) continue;
+        extract(line, "$oid", oid);
+        extract(line, "url", url);
 
-        extract(line, "$oid", documents[stats.doc_count].oid, 32);
-        extract(line, "url", documents[stats.doc_count].url, 512);
-
-        snprintf(documents[stats.doc_count].title, 256,
-                 "Document %d", stats.doc_count);
-
-
-        printf("URL: %s, HTML: %s\n", documents[stats.doc_count].url, html);
+        Document doc;
+        doc.oid = oid;
+        doc.url = url;
+        doc.title = "Document " + std::to_string(stats.doc_count);
+        documents.push_back(doc);
 
         process_html(html, stats.doc_count);
         stats.doc_count++;
@@ -306,17 +205,17 @@ int main() {
     save_forward("forward.idx");
     save_inverted("inverted.idx");
 
-    fprintf(stderr, "Documents: %d\n", stats.doc_count);
-    fprintf(stderr, "Unique terms: %lld\n", stats.total_unique_terms);
-    fprintf(stderr, "Total tokens: %lld\n", stats.total_tokens);
-    fprintf(stderr, "Avg token length: %.2f\n",
-            (double)stats.total_token_length / stats.total_tokens);
-    fprintf(stderr, "Input size: %.2f KB\n",
-            stats.total_input_bytes / 1024.0);
-    fprintf(stderr, "Time: %.3f sec\n", elapsed);
-    fprintf(stderr, "Speed: %.2f KB/sec\n",
-            (stats.total_input_bytes / 1024.0) / elapsed);
 
-    free(line);
+    // Вывод статистики
+    std::cout << "Documents: " << stats.doc_count << "\n";
+    std::cout << "Unique terms: " << stats.total_unique_terms << "\n";
+    std::cout << "Total tokens: " << stats.total_tokens << "\n";
+    std::cout << "Avg token length: "
+              << (stats.total_tokens ? (double)stats.total_token_length / stats.total_tokens : 0) << "\n";
+    std::cout << "Input size: " << stats.total_input_bytes / 1024.0 << " KB\n";
+    std::cout << "Time: " << elapsed << " sec\n";
+    std::cout << "Speed: " << (stats.total_input_bytes / 1024.0) / elapsed << " KB/sec\n";
+
+
     return 0;
 }
