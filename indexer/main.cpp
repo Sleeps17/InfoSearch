@@ -251,11 +251,5 @@ int main() {
     std::cout << "Time: " << elapsed << " sec\n";
     std::cout << "Speed: " << (stats.total_input_bytes / 1024.0) / elapsed << " KB/sec\n";
 
-
-    std::cout << "Terms" << std::endl;
-    for (auto& [key, value] : hash_table) {
-        std::cout << key << ": " << value->freq << std::endl;
-    }
-
     return 0;
 }
