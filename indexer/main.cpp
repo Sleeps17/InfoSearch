@@ -229,6 +229,8 @@ int main() {
         doc.title = "Document " + std::to_string(stats.doc_count);
         documents.push_back(doc);
 
+        std::cout << "\rProcessed document: " << stats.doc_count;
+
         process_html(html, stats.doc_count);
         stats.doc_count++;
     }
